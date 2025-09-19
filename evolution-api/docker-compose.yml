@@ -1,0 +1,101 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: pg_local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: appdb
+      TZ: America/Sao_Paulo
+      PGTZ: America/Sao_Paulo
+      LANG: en_US.utf8
+      LC_ALL: en_US.utf8
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:latest
+    container_name: redis_local
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: redispass123
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  evolutionapi:
+    image: atendai/evolution-api:latest
+    container_name: evolution_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Servidor
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      CORS_ORIGIN: "*"
+
+      # Autenticação global da API
+      AUTHENTICATION_API_KEY: change-me-strong-key
+
+      # Persistência (PostgreSQL)
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      # usa o banco "appdb" criado acima; ajuste se preferir outro
+      DATABASE_CONNECTION_URI: postgresql://admin:admin@postgres:5432/appdb?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: theretech_evolution
+
+      # Cache (Redis)
+      CACHE_REDIS_ENABLED: "true"
+      # sintaxe com senha: redis://:SENHA@host:porta/dbindex
+      CACHE_REDIS_URI: redis://:redispass123@redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_LOCAL_ENABLED: "false"
+
+      # Logs (opcionalmente ajuste)
+      LOG_LEVEL: INFO
+      LOG_COLOR: "true"
+
+      # Idioma (opcional)
+      LANGUAGE: pt
+
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+# Opcional: UI para o Redis (descomente para usar)
+#  redisinsight:
+#    image: redis/redisinsight:latest
+#    container_name: redis_insight
+#    restart: unless-stopped
+#    ports:
+#      - "5540:5540"
+
+volumes:
+  pgdata:
+  redisdata:
+

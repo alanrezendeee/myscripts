@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: pg_local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: appdb
+      TZ: America/Sao_Paulo
+      PGTZ: America/Sao_Paulo
+      LANG: en_US.utf8
+      LC_ALL: en_US.utf8
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:latest
+    container_name: redis_local
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: redispass123
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+# Opcional: UI para o Redis (descomente para usar)
+#  redisinsight:
+#    image: redis/redisinsight:latest
+#    container_name: redis_insight
+#    restart: unless-stopped
+#    ports:
+#      - "5540:5540"
+
+volumes:
+  pgdata:
+  redisdata:
+
